@@ -1,0 +1,32 @@
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+/* 01) User Model */
+
+model User {
+  id String           @default(cuid()) @id
+  email String        @unique
+  password String?
+  fname String
+  lname String
+  role Role           @default(USER)
+  isActive Boolean    @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  @@index([email])
+}
+
