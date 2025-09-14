@@ -1,46 +1,63 @@
 import { Injectable } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
 import { DatabaseService } from "src/database/database.service";
+import { CreateUserDto } from "./dtos/create-user.dto";
+import { UpdateUserDto } from "./dtos/update-user.dto";
+import { UserResponseDto } from "./dtos/user-response";
+
+const select = Object.entries(new UserResponseDto()).reduce((prev, [k]) => {
+  prev[k] = true;
+  return prev;
+}, {});
 
 @Injectable()
 export class UsersService {
   constructor(private readonly databaseService: DatabaseService) {}
 
-  create(createUserDto: Prisma.UserCreateInput) {
-    return this.databaseService.user.create({
+  async create(createUserDto: CreateUserDto): Promise<UserResponseDto> {
+    const user = (await this.databaseService.user.create({
       data: createUserDto,
+      select,
+    })) as UserResponseDto;
+    return user;
+  }
+
+  async findAll() {
+    return await this.databaseService.user.findMany({
+      where: {
+        isActive: true,
+      },
+      select,
     });
   }
 
-  findAll() {
-    return this.databaseService.user.findMany({});
-  }
-
-  findOne(id: string) {
-    return this.databaseService.user.findUnique({
+  async findOne(id: string) {
+    return await this.databaseService.user.findUnique({
       where: {
         id,
       },
+      select,
     });
   }
 
-  update(id: string, updateUserDto: Prisma.UserUpdateInput) {
-    return this.databaseService.user.update({
+  async update(id: string, updateUserDto: UpdateUserDto) {
+    return await this.databaseService.user.update({
       where: {
         id,
       },
       data: updateUserDto,
+      select,
     });
   }
 
-  remove(id: string) {
-    return this.databaseService.user.update({
+  async remove(id: string) {
+    return await this.databaseService.user.update({
       where: {
         id,
       },
       data: {
         isActive: false,
       },
+      select,
     });
   }
 }

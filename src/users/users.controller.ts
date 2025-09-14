@@ -8,37 +8,35 @@ import {
   Delete,
 } from "@nestjs/common";
 import { UsersService } from "./users.service";
-import { Prisma } from "@prisma/client";
+import { CreateUserDto } from "./dtos/create-user.dto";
+import { UpdateUserDto } from "./dtos/update-user.dto";
 
 @Controller("users")
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
-  create(@Body() createUserDto: Prisma.UserCreateInput) {
-    return this.usersService.create(createUserDto);
+  async create(@Body() body: CreateUserDto) {
+    return await this.usersService.create(body);
   }
 
   @Get()
-  findAll() {
+  async findAll() {
     return this.usersService.findAll();
   }
 
   @Get(":id")
-  findOne(@Param("id") id: string) {
+  async findOne(@Param("id") id: string) {
     return this.usersService.findOne(id);
   }
 
   @Patch(":id")
-  update(
-    @Param("id") id: string,
-    @Body() updateUserDto: Prisma.UserUpdateInput,
-  ) {
-    return this.usersService.update(id, updateUserDto);
+  async update(@Param("id") id: string, @Body() body: UpdateUserDto) {
+    return this.usersService.update(id, body);
   }
 
   @Delete(":id")
-  remove(@Param("id") id: string) {
+  async remove(@Param("id") id: string) {
     return this.usersService.remove(id);
   }
 }

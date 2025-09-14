@@ -15,6 +15,7 @@ enum Role {
   ADMIN
 }
 
+
 /* 01) User Model */
 
 model User {
@@ -23,10 +24,13 @@ model User {
   password String?
   fname String
   lname String
+  photo String?
   role Role           @default(USER)
   isActive Boolean    @default(true)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+
+  passwordLastChangedAt DateTime?
   @@index([email])
 }
 
