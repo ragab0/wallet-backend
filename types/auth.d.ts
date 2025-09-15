@@ -2,11 +2,18 @@ import { UserResponseDto } from "src/users/dtos/user-response";
 
 export interface JwtPayload {
   id: string;
-  passwordChangedAt: Date | null;
+  email: string;
 }
 
-export interface JwtResponse {
+export interface RefreshTokenResponse {
   status: "success";
-  token: string;
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface AuthResponse {
+  status: "success";
+  accessToken: string;
+  refreshToken: string;
   data: UserResponseDto;
 }
