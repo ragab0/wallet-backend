@@ -7,7 +7,7 @@ import { SignupDto } from "./dtos/signup.dto";
 import { LoginDto } from "./dtos/login.dto";
 import { CreateUserDto } from "src/users/dtos/create-user.dto";
 import { JwtService } from "@nestjs/jwt";
-import { AuthResponse, JwtPayload } from "types/auth";
+import { AuthResponse, JwtPayload, OAuthUser } from "types/auth";
 import { DatabaseService } from "src/database/database.service";
 import { plainToInstance } from "class-transformer";
 import { UserResponseDto } from "src/users/dtos/user-response.dto";
@@ -132,5 +132,67 @@ export class AuthService {
     } catch (_) {
       throw new UnauthorizedException("Invalid refresh token");
     }
+  }
+
+  /** Passport auth */
+
+  async googleLogin(oauthUser: OAuthUser): Promise<AuthResponse> {
+    return this.handleOAuthLogin(oauthUser);
+  }
+
+  async appleLogin(oauthUser: OAuthUser): Promise<AuthResponse> {
+    return this.handleOAuthLogin(oauthUser);
+  }
+
+  private async handleOAuthLogin(oauthUser: OAuthUser): Promise<AuthResponse> {
+    // Check if user exists
+    const whereConditions: Record<string, any>[] = [{ email: oauthUser.email }];
+
+    if (oauthUser.googleId)
+      whereConditions.push({ googleId: oauthUser.googleId });
+    else if (oauthUser.appleId)
+      whereConditions.push({ appleId: oauthUser.appleId });
+
+    let user: User | null = await this.databaseService.user.findFirst({
+      where: { OR: whereConditions },
+    });
+
+    // If user exists, update missing OAuth IDs or picture
+    if (user) {
+      const updateData: Record<string, any> = {};
+      if (oauthUser.googleId && !user.googleId)
+        updateData.googleId = oauthUser.googleId;
+      if (oauthUser.appleId && !user.appleId)
+        updateData.appleId = oauthUser.appleId;
+      if (oauthUser.picture && !user.picture)
+        updateData.picture = oauthUser.picture;
+
+      if (Object.keys(updateData).length > 0) {
+        user = await this.databaseService.user.update({
+          where: { id: user.id },
+          data: updateData,
+        });
+      }
+    }
+    // otherwise, create a new user
+    else {
+      user = await this.databaseService.user.create({
+        data: {
+          email: oauthUser.email,
+          fname: oauthUser.firstName,
+          lname: oauthUser.lastName,
+          googleId: oauthUser.googleId || null,
+          appleId: oauthUser.appleId || null,
+          picture: oauthUser.picture || null,
+          isEmailVerified: oauthUser.isEmailVerified ?? true,
+        },
+      });
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException("Your account has been deactivated");
+    }
+
+    return this.sendAuthResponse(user);
   }
 }
