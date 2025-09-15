@@ -1,3 +1,4 @@
+import { Role } from "@prisma/client";
 import { Expose } from "class-transformer";
 
 export class UserResponseDto {
@@ -12,7 +13,7 @@ export class UserResponseDto {
   @Expose()
   photo: string | null;
   @Expose()
-  role: string;
+  role: Role;
   @Expose()
   createdAt: Date;
   @Expose()

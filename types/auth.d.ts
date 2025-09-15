@@ -1,4 +1,4 @@
-import { UserResponseDto } from "src/users/dtos/user-response";
+import { UserResponseDto } from "src/users/dtos/user-response.dto";
 
 export interface JwtPayload {
   id: string;
