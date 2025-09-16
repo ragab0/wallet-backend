@@ -21,11 +21,16 @@ export interface AuthResponse {
   data: UserResponseDto;
 }
 
+export interface EmailSendResponse {
+  status: "success";
+  message: string;
+}
+
 export interface OAuthUser {
   googleId?: string;
   appleId?: string;
   firstName: string;
-  lastName: string;
+  lastName?: string;
   email: string;
   picture?: string;
   isEmailVerified?: boolean;

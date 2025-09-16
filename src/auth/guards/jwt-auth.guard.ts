@@ -49,10 +49,10 @@ export class JwtAuthGuard implements CanActivate {
 
       if (!user) {
         throw new UnauthorizedException("User not found");
-      }
-
-      if (!user.isActive) {
+      } else if (!user.isActive) {
         throw new UnauthorizedException("Account is deactivated");
+      } else if (!user.isEmailVerified) {
+        throw new UnauthorizedException("Email is not verified");
       }
 
       request.user = user;

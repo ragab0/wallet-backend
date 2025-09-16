@@ -35,6 +35,10 @@ model User {
   picture String?
   isEmailVerified Boolean  @default(false)
 
+  // Email verification fields
+  emailVerificationToken          String?
+  emailVerificationTokenExpiresAt DateTime?
+
   passwordLastChangedAt DateTime?
   @@index([email])
 }

@@ -12,11 +12,14 @@ import {
 import { SignupDto } from "./dtos/signup.dto";
 import { AuthService } from "./auth.service";
 import { LoginDto } from "./dtos/login.dto";
-import { CurrentUser } from "./decorators/current-user.decorator";
-import { User as PrismaUser } from "@prisma/client";
 import { Public } from "./decorators/public.decorator";
 import { GoogleOAuthGuard } from "./guards/google-oauth.guard";
 import { OAuthUser } from "types/auth";
+import { EmailService } from "src/email/email.service";
+import {
+  SendVerificationDto,
+  VerifyEmailDto,
+} from "src/email/dtos/email-verification.dto";
 
 interface OAuthRequest extends Request {
   user: OAuthUser;
@@ -24,7 +27,10 @@ interface OAuthRequest extends Request {
 
 @Controller("auth")
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly emailService: EmailService,
+  ) {}
 
   @Public()
   @HttpCode(201)
@@ -35,8 +41,7 @@ export class AuthController {
 
   @Public()
   @Post("login")
-  async login(@Body() body: LoginDto, @CurrentUser() user: PrismaUser) {
-    console.log(user);
+  async login(@Body() body: LoginDto) {
     return await this.authService.login(body);
   }
 
@@ -46,6 +51,23 @@ export class AuthController {
     const refreshToken = authHeader?.replace("Bearer ", "");
     return await this.authService.refreshToken(refreshToken);
   }
+
+  @Public()
+  @Post("send-verification")
+  async sendVerification(@Body() body: SendVerificationDto) {
+    return this.authService.sendVerificationEmail(body);
+  }
+
+  @Public()
+  @Post("verify-email")
+  async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
+    return this.authService.verifyEmail(verifyEmailDto);
+  }
+  // @Public()
+  // @Get("verify-email/:token")
+  // async verifyEmail2(@Param("token") token: string) {
+  //   return this.authService.verifyEmail({ token });
+  // }
 
   // Google OAuth routes
   @Public()

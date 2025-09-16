@@ -7,8 +7,10 @@ import { Reflector } from "@nestjs/core";
 import { GoogleOAuthGuard } from "./guards/google-oauth.guard";
 import { AppleOAuthGuard } from "./guards/apple-oauth.guard";
 import { GoogleStrategy } from "./strategies/google.strategy";
+import { EmailModule } from "src/email/email.module";
 
 @Module({
+  imports: [EmailModule],
   controllers: [AuthController],
   providers: [
     AuthService,

@@ -1,18 +1,29 @@
+import * as bcrypt from "bcrypt";
+import * as crypto from "crypto";
+import { SignupDto } from "./dtos/signup.dto";
+import { LoginDto } from "./dtos/login.dto";
+import { CreateUserDto } from "src/users/dtos/create-user.dto";
+import { JwtService } from "@nestjs/jwt";
+import {
+  AuthResponse,
+  EmailSendResponse,
+  JwtPayload,
+  OAuthUser,
+} from "types/auth";
+import { DatabaseService } from "src/database/database.service";
+import { plainToInstance } from "class-transformer";
+import { UserResponseDto } from "src/users/dtos/user-response.dto";
+import { User } from "@prisma/client";
+import { EmailService } from "src/email/email.service";
+import {
+  SendVerificationDto,
+  VerifyEmailDto,
+} from "src/email/dtos/email-verification.dto";
 import {
   BadRequestException,
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
-import { SignupDto } from "./dtos/signup.dto";
-import { LoginDto } from "./dtos/login.dto";
-import { CreateUserDto } from "src/users/dtos/create-user.dto";
-import { JwtService } from "@nestjs/jwt";
-import { AuthResponse, JwtPayload, OAuthUser } from "types/auth";
-import { DatabaseService } from "src/database/database.service";
-import { plainToInstance } from "class-transformer";
-import { UserResponseDto } from "src/users/dtos/user-response.dto";
-import { User } from "@prisma/client";
-import * as bcrypt from "bcrypt";
 
 const { JWT_ACCESS_EXPIRES_IN = "15m", JWT_REFRESH_EXPIRES_IN = "7d" } =
   process.env;
@@ -22,6 +33,7 @@ export class AuthService {
   constructor(
     private readonly jwtService: JwtService,
     private readonly databaseService: DatabaseService,
+    private readonly emailService: EmailService,
   ) {}
 
   private createAccessToken(payload: JwtPayload): string {
@@ -88,6 +100,12 @@ export class AuthService {
       },
     });
 
+    try {
+      await this.emailService.sendWelcomeEmail(email, user.fname);
+    } catch (error) {
+      console.error("Failed to send welcome email:", error);
+    }
+
     return this.sendAuthResponse(user);
   }
 
@@ -98,18 +116,14 @@ export class AuthService {
       },
     });
 
-    if (!user) {
+    if (!user || !(await bcrypt.compare(body.password, user.password || ""))) {
       throw new BadRequestException("Incorrect email or password");
-    }
-
-    if (!user.isActive) {
+    } else if (!user.isActive) {
       throw new UnauthorizedException("Your account has been deactivated");
-    }
-
-    if (
-      !(user.password && (await bcrypt.compare(body.password, user.password)))
-    ) {
-      throw new BadRequestException("Incorrect email or password");
+    } else if (!user.isEmailVerified) {
+      throw new UnauthorizedException(
+        "Please verify your email before logging in",
+      );
     }
 
     return this.sendAuthResponse(user);
@@ -180,13 +194,23 @@ export class AuthService {
         data: {
           email: oauthUser.email,
           fname: oauthUser.firstName,
-          lname: oauthUser.lastName,
+          lname: oauthUser.lastName || "Wallet",
           googleId: oauthUser.googleId || null,
           appleId: oauthUser.appleId || null,
           picture: oauthUser.picture || null,
           isEmailVerified: oauthUser.isEmailVerified ?? true,
         },
       });
+
+      // Send welcome email
+      try {
+        await this.emailService.sendWelcomeEmail(
+          oauthUser.email,
+          oauthUser.firstName,
+        );
+      } catch (error) {
+        console.error("Failed to send welcome email:", error);
+      }
     }
 
     if (!user.isActive) {
@@ -194,5 +218,82 @@ export class AuthService {
     }
 
     return this.sendAuthResponse(user);
+  }
+
+  /** email */
+
+  private generateEmailVerificationToken(): { token: string; expires: Date } {
+    const token = crypto.randomBytes(32).toString("hex");
+    const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes;
+    return { token, expires };
+  }
+
+  async sendVerificationEmail(
+    body: SendVerificationDto,
+  ): Promise<EmailSendResponse> {
+    const normalizedEmail = body.email.trim().toLowerCase();
+    const user = await this.databaseService.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (!user) {
+      throw new BadRequestException("User with this email does not exist");
+    } else if (user.isEmailVerified) {
+      throw new BadRequestException("Email is already verified");
+    }
+
+    // Generate new verification token && save
+    const { token, expires } = this.generateEmailVerificationToken();
+    await this.databaseService.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerificationToken: token,
+        emailVerificationTokenExpiresAt: expires,
+      },
+    });
+
+    // Send verification email
+    try {
+      await this.emailService.sendVerificationEmail(
+        normalizedEmail,
+        token,
+        user.fname,
+      );
+    } catch (error) {
+      console.error("Failed to send verification email:", error);
+      throw new BadRequestException("Failed to send verification email");
+    }
+
+    return {
+      status: "success",
+      message: "Verification email sent successfully",
+    };
+  }
+
+  async verifyEmail(verifyEmailDto: VerifyEmailDto): Promise<AuthResponse> {
+    const { token } = verifyEmailDto;
+    const user: User | null = await this.databaseService.user.findFirst({
+      where: {
+        emailVerificationToken: token,
+        emailVerificationTokenExpiresAt: {
+          gte: new Date(),
+        },
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException("Invalid or expired verification token");
+    }
+
+    const updatedUser: User = await this.databaseService.user.update({
+      where: { id: user.id },
+      data: {
+        isEmailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationTokenExpiresAt: null,
+      },
+    });
+
+    return this.sendAuthResponse(updatedUser);
   }
 }
