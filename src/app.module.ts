@@ -9,7 +9,8 @@ import { JwtModule } from "@nestjs/jwt";
 import { APP_GUARD } from "@nestjs/core";
 import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
 import { RolesGuard } from "./auth/guards/roles.guard";
-import { EmailModule } from './email/email.module';
+import { EmailModule } from "./email/email.module";
+import { TransactionsModule } from './transactions/transactions.module';
 
 const { JWT_SECRET, JWT_ACCESS_EXPIRES_IN = "15m" } = process.env;
 
@@ -26,6 +27,7 @@ const { JWT_SECRET, JWT_ACCESS_EXPIRES_IN = "15m" } = process.env;
     AuthModule,
     UsersModule,
     EmailModule,
+    TransactionsModule,
   ],
   controllers: [AppController],
   providers: [

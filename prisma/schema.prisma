@@ -15,31 +15,54 @@ enum Role {
   ADMIN
 }
 
-
-/* 01) User Model */
+/**
+ * 01) User Model
+ */
 
 model User {
-  id String           @default(cuid()) @id
-  email String        @unique
-  password String?
-  fname String
-  lname String
-  role Role           @default(USER)
-  isActive Boolean    @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String?
+  fname     String
+  lname     String
+  role      Role     @default(USER)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  passwordLastChangedAt DateTime?
 
   // OAuth fields
-  googleId String?    @unique
-  appleId String?     @unique
-  picture String?
-  isEmailVerified Boolean  @default(false)
+  googleId        String? @unique
+  appleId         String? @unique
+  picture         String?
+  isEmailVerified Boolean @default(false)
 
   // Email verification fields
   emailVerificationToken          String?
   emailVerificationTokenExpiresAt DateTime?
 
-  passwordLastChangedAt DateTime?
+  // Relations
+  Transaction Transaction[]
+
   @@index([email])
 }
 
+/**
+ * 02) Transaction Model
+ */
+model Transaction {
+  id        String   @id @default(cuid())
+  userId    String
+  amount    Float
+  title     String
+  type      String
+  category  String
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}

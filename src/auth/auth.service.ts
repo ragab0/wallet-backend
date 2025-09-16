@@ -4,12 +4,6 @@ import { SignupDto } from "./dtos/signup.dto";
 import { LoginDto } from "./dtos/login.dto";
 import { CreateUserDto } from "src/users/dtos/create-user.dto";
 import { JwtService } from "@nestjs/jwt";
-import {
-  AuthResponse,
-  EmailSendResponse,
-  JwtPayload,
-  OAuthUser,
-} from "types/auth";
 import { DatabaseService } from "src/database/database.service";
 import { plainToInstance } from "class-transformer";
 import { UserResponseDto } from "src/users/dtos/user-response.dto";
@@ -24,6 +18,12 @@ import {
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
+import {
+  AuthResponse,
+  EmailSendResponse,
+  JwtPayload,
+  OAuthUser,
+} from "types/auth";
 
 const { JWT_ACCESS_EXPIRES_IN = "15m", JWT_REFRESH_EXPIRES_IN = "7d" } =
   process.env;
