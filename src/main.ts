@@ -1,6 +1,6 @@
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
-import { ValidationPipe } from "@nestjs/common";
+import { RequestMethod, ValidationPipe } from "@nestjs/common";
 
 const PORT = process.env.PORT ?? 3000;
 
@@ -17,6 +17,14 @@ async function bootstrap() {
   app.enableCors({
     origin: true,
     credentials: true,
+  });
+
+  // a global prefix
+  app.setGlobalPrefix("api/v1", {
+    exclude: [
+      { path: "docs", method: RequestMethod.ALL },
+      { path: "/", method: RequestMethod.GET },
+    ],
   });
 
   await app.listen(PORT);
