@@ -1,3 +1,10 @@
+import { ApiTags, ApiBearerAuth } from "@nestjs/swagger";
+import { TransactionsService } from "./transactions.service";
+import { CreateTransactionDto } from "./dto/create-transaction.dto";
+import { UpdateTransactionDto } from "./dto/update-transaction.dto";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { Role, User } from "@prisma/client";
+import { Roles } from "../auth/decorators/roles.decorator";
 import {
   Controller,
   Get,
@@ -11,25 +18,41 @@ import {
   HttpStatus,
   HttpCode,
 } from "@nestjs/common";
-import { TransactionsService } from "./transactions.service";
-import { CreateTransactionDto } from "./dto/create-transaction.dto";
-import { UpdateTransactionDto } from "./dto/update-transaction.dto";
-import { CurrentUser } from "src/auth/decorators/current-user.decorator";
-import { Role, User } from "@prisma/client";
-import { Roles } from "src/auth/decorators/roles.decorator";
+import {
+  CreateTransactionApiOperation,
+  CreateTransactionApiBody,
+  CreateTransactionApiResponses,
+  GetAllTransactionsApiOperation,
+  GetAllTransactionsApiQuery,
+  GetAllTransactionsApiResponses,
+  GetTransactionByIdApiOperation,
+  TransactionIdParam,
+  GetTransactionByIdApiResponses,
+  UpdateTransactionApiOperation,
+  UpdateTransactionApiBody,
+  UpdateTransactionApiResponses,
+  DeleteTransactionApiOperation,
+  DeleteTransactionApiResponses,
+} from "./docs/transactions.swagger";
 
 /**
- *  // Normal user → force their own ID
- *  // For admin, only use the transaction ID
- *  // For normal users, include their user ID in the query
+ * Controller for handling transaction-related HTTP requests.
+ * Provides endpoints for creating, reading, updating, and deleting transactions.
  *
+ * @remarks
+ * - Normal users can only access their own transactions
+ * - Admins can access all transactions and filter by user ID
  */
-
+@ApiTags("Transactions")
+@ApiBearerAuth()
 @Controller("transactions")
 export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}
 
   @Post()
+  @CreateTransactionApiOperation()
+  @CreateTransactionApiBody()
+  @CreateTransactionApiResponses()
   create(
     @CurrentUser() user: User,
     @Body() createTransactionDto: CreateTransactionDto,
@@ -40,6 +63,9 @@ export class TransactionsController {
   }
 
   @Get()
+  @GetAllTransactionsApiOperation()
+  @GetAllTransactionsApiQuery()
+  @GetAllTransactionsApiResponses()
   async findAll(@CurrentUser() user: User, @Query("userId") userId?: string) {
     if (user.role === Role.ADMIN && userId)
       return this.transactionsService.findAll(userId);
@@ -47,6 +73,9 @@ export class TransactionsController {
   }
 
   @Get(":id")
+  @GetTransactionByIdApiOperation()
+  @TransactionIdParam()
+  @GetTransactionByIdApiResponses()
   async findOne(@Param("id") id: string, @CurrentUser() user: User) {
     const transaction = await this.transactionsService.findOne(
       id,
@@ -64,6 +93,10 @@ export class TransactionsController {
 
   @Roles(Role.ADMIN)
   @Patch(":id")
+  @UpdateTransactionApiOperation()
+  @TransactionIdParam()
+  @UpdateTransactionApiBody()
+  @UpdateTransactionApiResponses()
   async update(
     @Param("id") id: string,
     @Body() updateTransactionDto: UpdateTransactionDto,
@@ -79,6 +112,9 @@ export class TransactionsController {
 
   @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(":id")
+  @DeleteTransactionApiOperation()
+  @TransactionIdParam()
+  @DeleteTransactionApiResponses()
   async remove(@Param("id") id: string, @CurrentUser() user: User) {
     const existingTransaction = await this.transactionsService.findOne(
       id,

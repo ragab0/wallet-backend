@@ -20,11 +20,30 @@ import {
   SendVerificationDto,
   VerifyEmailDto,
 } from "src/email/dtos/email-verification.dto";
+import {
+  AuthApiTags,
+  LoginApiOperation,
+  LoginApiBody,
+  LoginApiResponses,
+  RefreshTokenApiOperation,
+  RefreshTokenApiHeader,
+  RefreshTokenApiResponses,
+  SendVerificationApiOperation,
+  SendVerificationApiBody,
+  VerifyEmailApiOperation,
+  VerifyEmailApiBody,
+  GoogleAuthApiOperation,
+  GoogleAuthCallbackApiOperation,
+  SignupApiOperation,
+  SignupApiBody,
+  SignupApiResponses,
+} from "./docs/auth.swagger";
 
 interface OAuthRequest extends Request {
   user: OAuthUser;
 }
 
+@AuthApiTags()
 @Public()
 @Controller("auth")
 export class AuthController {
@@ -33,17 +52,26 @@ export class AuthController {
     private readonly emailService: EmailService,
   ) {}
 
+  @SignupApiOperation()
+  @SignupApiBody()
+  @SignupApiResponses()
   @HttpCode(201)
   @Post("signup")
   async signup(@Body() body: SignupDto) {
     return await this.authService.signup(body);
   }
 
+  @LoginApiOperation()
+  @LoginApiBody()
+  @LoginApiResponses()
   @Post("login")
   async login(@Body() body: LoginDto) {
     return await this.authService.login(body);
   }
 
+  @RefreshTokenApiOperation()
+  @RefreshTokenApiHeader()
+  @RefreshTokenApiResponses()
   @Post("refresh")
   @HttpCode(201)
   async refreshToken(@Headers("authorization") authHeader: string) {
@@ -51,11 +79,15 @@ export class AuthController {
     return await this.authService.refreshToken(refreshToken);
   }
 
+  @SendVerificationApiOperation()
+  @SendVerificationApiBody()
   @Post("send-verification")
   async sendVerification(@Body() body: SendVerificationDto) {
     return this.authService.sendVerificationEmail(body);
   }
 
+  @VerifyEmailApiOperation()
+  @VerifyEmailApiBody()
   @Post("verify-email")
   async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
     return this.authService.verifyEmail(verifyEmailDto);
@@ -67,12 +99,14 @@ export class AuthController {
   // }
 
   // Google OAuth routes
+  @GoogleAuthApiOperation()
   @Get("google")
   @UseGuards(GoogleOAuthGuard)
   async googleAuth(): Promise<void> {
     // Guard redirects to Google
   }
 
+  @GoogleAuthCallbackApiOperation()
   @Get("google/callback")
   @UseGuards(GoogleOAuthGuard)
   @Redirect()
