@@ -24,6 +24,10 @@ export interface AuthResponse {
 export interface EmailSendResponse {
   status: "success";
   message: string;
+  data: {
+    email: string;
+    expiresIn: date;
+  };
 }
 
 export interface OAuthUser {

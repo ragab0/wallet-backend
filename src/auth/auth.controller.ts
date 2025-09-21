@@ -25,6 +25,7 @@ interface OAuthRequest extends Request {
   user: OAuthUser;
 }
 
+@Public()
 @Controller("auth")
 export class AuthController {
   constructor(
@@ -32,14 +33,12 @@ export class AuthController {
     private readonly emailService: EmailService,
   ) {}
 
-  @Public()
   @HttpCode(201)
   @Post("signup")
   async signup(@Body() body: SignupDto) {
     return await this.authService.signup(body);
   }
 
-  @Public()
   @Post("login")
   async login(@Body() body: LoginDto) {
     return await this.authService.login(body);
@@ -52,13 +51,11 @@ export class AuthController {
     return await this.authService.refreshToken(refreshToken);
   }
 
-  @Public()
   @Post("send-verification")
   async sendVerification(@Body() body: SendVerificationDto) {
     return this.authService.sendVerificationEmail(body);
   }
 
-  @Public()
   @Post("verify-email")
   async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
     return this.authService.verifyEmail(verifyEmailDto);
@@ -70,14 +67,12 @@ export class AuthController {
   // }
 
   // Google OAuth routes
-  @Public()
   @Get("google")
   @UseGuards(GoogleOAuthGuard)
   async googleAuth(): Promise<void> {
     // Guard redirects to Google
   }
 
-  @Public()
   @Get("google/callback")
   @UseGuards(GoogleOAuthGuard)
   @Redirect()
@@ -104,14 +99,12 @@ export class AuthController {
   }
 
   // Apple OAuth
-  // @Public()
   // @Get("apple")
   // @UseGuards(AppleOAuthGuard)
   // async appleAuth(): Promise<void> {
   //   // Redirects to Apple
   // }
 
-  // @Public()
   // @Post("apple/callback")
   // @UseGuards(AppleOAuthGuard)
   // async appleAuthRedirect(@Req() req: OAuthRequest) {

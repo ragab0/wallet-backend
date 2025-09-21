@@ -1,11 +1,36 @@
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { RequestMethod, ValidationPipe } from "@nestjs/common";
+import { Logger } from "nestjs-pino";
+import pinoHttp from "pino-http";
+import { NextFunction, Request, Response } from "express";
 
 const PORT = process.env.PORT ?? 3000;
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+  });
+
+  app.useLogger(app.get(Logger));
+  app.use(
+    pinoHttp({
+      transport: {
+        target: "pino-pretty",
+        options: { colorize: true },
+      },
+    }),
+  );
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const oldSend = res.send;
+    res.send = function (body) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      req.log.info({ responseBody: body }, "Response sent");
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+      return oldSend.call(this, body);
+    };
+    next();
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({

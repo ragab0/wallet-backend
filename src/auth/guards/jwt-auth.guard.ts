@@ -4,6 +4,8 @@ import {
   CanActivate,
   ExecutionContext,
   UnauthorizedException,
+  HttpException,
+  HttpStatus,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { JwtService } from "@nestjs/jwt";
@@ -37,6 +39,7 @@ export class JwtAuthGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest<Request>();
     const token = this.extractTokenFromHeader(request);
+
     if (!token) {
       throw new UnauthorizedException("Access token is required");
     }
@@ -52,7 +55,16 @@ export class JwtAuthGuard implements CanActivate {
       } else if (!user.isActive) {
         throw new UnauthorizedException("Account is deactivated");
       } else if (!user.isEmailVerified) {
-        throw new UnauthorizedException("Email is not verified");
+        throw new HttpException(
+          {
+            message: "Please verify your email before logging in",
+            redirectTo: "/send-verification",
+            payload: {
+              email: user.email,
+            },
+          },
+          HttpStatus.TEMPORARY_REDIRECT,
+        );
       }
 
       request.user = user;

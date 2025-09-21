@@ -15,6 +15,8 @@ import {
 } from "src/email/dtos/email-verification.dto";
 import {
   BadRequestException,
+  HttpException,
+  HttpStatus,
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
@@ -106,13 +108,23 @@ export class AuthService {
       console.error("Failed to send welcome email:", error);
     }
 
-    return this.sendAuthResponse(user);
+    throw new HttpException(
+      {
+        message: "Please confirm your email to complete your registration",
+        redirectTo: "/send-verification",
+        payload: {
+          email,
+        },
+      },
+      HttpStatus.TEMPORARY_REDIRECT,
+    );
   }
 
   async login(body: LoginDto): Promise<AuthResponse> {
+    const email = body.email.toLocaleLowerCase().trim();
     const user = await this.databaseService.user.findUnique({
       where: {
-        email: body.email.toLocaleLowerCase().trim(),
+        email,
       },
     });
 
@@ -121,8 +133,15 @@ export class AuthService {
     } else if (!user.isActive) {
       throw new UnauthorizedException("Your account has been deactivated");
     } else if (!user.isEmailVerified) {
-      throw new UnauthorizedException(
-        "Please verify your email before logging in",
+      throw new HttpException(
+        {
+          message: "Please verify your email before logging in",
+          redirectTo: "/send-verification",
+          payload: {
+            email,
+          },
+        },
+        HttpStatus.TEMPORARY_REDIRECT,
       );
     }
 
@@ -222,10 +241,13 @@ export class AuthService {
 
   /** email */
 
-  private generateEmailVerificationToken(): { token: string; expires: Date } {
-    const token = crypto.randomBytes(32).toString("hex");
-    const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes;
-    return { token, expires };
+  private generateEmailVerificationToken(): { code: string; expires: Date } {
+    // cryptographically 6-digit;
+    const randomBytes = crypto.randomBytes(4);
+    const randomNumber = randomBytes.readUInt32BE(0);
+    const code = ((randomNumber % 900000) + 100000).toString();
+    const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 min;
+    return { code, expires };
   }
 
   async sendVerificationEmail(
@@ -243,11 +265,11 @@ export class AuthService {
     }
 
     // Generate new verification token && save
-    const { token, expires } = this.generateEmailVerificationToken();
+    const { code, expires } = this.generateEmailVerificationToken();
     await this.databaseService.user.update({
       where: { id: user.id },
       data: {
-        emailVerificationToken: token,
+        emailVerificationToken: code,
         emailVerificationTokenExpiresAt: expires,
       },
     });
@@ -256,33 +278,42 @@ export class AuthService {
     try {
       await this.emailService.sendVerificationEmail(
         normalizedEmail,
-        token,
+        code,
         user.fname,
       );
-    } catch (error) {
-      console.error("Failed to send verification email:", error);
+    } catch (_) {
       throw new BadRequestException("Failed to send verification email");
     }
 
     return {
       status: "success",
       message: "Verification email sent successfully",
+      data: {
+        email: normalizedEmail,
+        expiresIn: expires,
+      },
     };
   }
 
-  async verifyEmail(verifyEmailDto: VerifyEmailDto): Promise<AuthResponse> {
-    const { token } = verifyEmailDto;
-    const user: User | null = await this.databaseService.user.findFirst({
+  async verifyEmail({ email, code }: VerifyEmailDto): Promise<AuthResponse> {
+    email = email.trim().toLowerCase();
+    const user = await this.databaseService.user.findUnique({
       where: {
-        emailVerificationToken: token,
-        emailVerificationTokenExpiresAt: {
-          gte: new Date(),
-        },
+        email,
       },
     });
 
     if (!user) {
-      throw new BadRequestException("Invalid or expired verification token");
+      throw new BadRequestException("User not found");
+    } else if (
+      !user.emailVerificationToken ||
+      !user.emailVerificationTokenExpiresAt
+    ) {
+      throw new BadRequestException("No verification code found");
+    } else if (user.emailVerificationTokenExpiresAt < new Date()) {
+      throw new BadRequestException("Verification code has expired");
+    } else if (user.emailVerificationToken !== code) {
+      throw new BadRequestException("Invalid verification code");
     }
 
     const updatedUser: User = await this.databaseService.user.update({

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Expose } from "class-transformer";
 import {
   IsEmail,

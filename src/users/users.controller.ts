@@ -73,7 +73,7 @@ export class UsersController {
     return this.usersService.remove(id);
   }
 
-  // User routes (specific fields [password, photo, role, email])
+  // User routes (specific fields [password, picture, role, email])
 
   @Patch(":id/password")
   async changePassword(

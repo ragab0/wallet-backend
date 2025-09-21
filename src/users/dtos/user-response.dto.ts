@@ -11,9 +11,14 @@ export class UserResponseDto {
   @Expose()
   lname: string;
   @Expose()
-  photo: string | null;
+  picture?: string;
   @Expose()
   role: Role;
+  @Expose()
+  isActive: boolean;
+  @Expose()
+  isEmailVerified: boolean;
+
   @Expose()
   createdAt: Date;
   @Expose()
