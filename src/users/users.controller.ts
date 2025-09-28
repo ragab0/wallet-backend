@@ -7,8 +7,11 @@ import {
   Param,
   Delete,
   HttpCode,
+  BadRequestException,
+  UploadedFile,
+  UseInterceptors,
 } from "@nestjs/common";
-import { ApiTags, ApiBearerAuth } from "@nestjs/swagger";
+import { ApiTags, ApiBearerAuth, ApiConsumes, ApiBody } from "@nestjs/swagger";
 import { UsersService } from "./users.service";
 import { CreateUserDto } from "./dtos/create-user.dto";
 import { UpdateUserDto, UpdateUserPasswordDto } from "./dtos/update-user.dto";
@@ -44,7 +47,15 @@ import {
   ChangeUserPasswordApiOperation,
   ChangeUserPasswordApiBody,
   ChangeUserPasswordApiResponses,
+  DeletePictureApiOperation,
+  DeletePictureApiResponses,
+  UploadPictureApiOperation,
+  UploadPictureApiResponses,
+  UploadPictureApiBody,
 } from "./docs/users.swagger";
+
+import { FileInterceptor } from "@nestjs/platform-express";
+import { Roles } from "src/auth/decorators/roles.decorator";
 
 @ApiTags("Users")
 @ApiBearerAuth()
@@ -60,21 +71,14 @@ export class UsersController {
     return await this.usersService.create(body);
   }
 
-  @Get()
-  @GetAllUsersApiOperation()
-  @GetAllUsersApiResponses()
-  async findAll() {
-    return this.usersService.findAll();
-  }
-
-  /** Me routes */
+  /** Me routes - deleagte to user operations */
 
   @Get("me")
   @GetMeApiOperation()
   @GetMeApiResponses()
   getMe(@CurrentUser() user: User) {
     // return this.usersService.getMe(user);
-    return this.usersService.findOne(user.id); // to not break our pattern - delegate
+    return this.usersService.findOne(user.id);
   }
 
   @Patch("me")
@@ -104,8 +108,43 @@ export class UsersController {
     return this.usersService.changePassword(user.id, body);
   }
 
+  @Post("me/picture")
+  @UploadPictureApiOperation()
+  @UploadPictureApiResponses()
+  @UseInterceptors(FileInterceptor("picture"))
+  @ApiConsumes("multipart/form-data")
+  @UploadPictureApiBody()
+  async uploadMyPicture(
+    @CurrentUser() user: User,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException("Picture file is required");
+    }
+
+    console.log("my picture uploading is:", file);
+
+    return this.usersService.uploadPicture(user.id, file);
+  }
+
+  @Delete("me/picture")
+  @DeletePictureApiOperation()
+  @DeletePictureApiResponses()
+  async deleteMyPicture(@CurrentUser() user: User) {
+    return this.usersService.deletePicture(user.id);
+  }
+
   /** User routes */
 
+  @Roles("ADMIN")
+  @Get()
+  @GetAllUsersApiOperation()
+  @GetAllUsersApiResponses()
+  async findAll() {
+    return this.usersService.findAll();
+  }
+
+  @Roles("ADMIN")
   @Get(":id")
   @GetUserByIdApiOperation()
   @UserIdParam()
@@ -114,6 +153,7 @@ export class UsersController {
     return this.usersService.findOne(id);
   }
 
+  @Roles("ADMIN")
   @Patch(":id")
   @UpdateUserApiOperation()
   @UserIdParam()
@@ -123,6 +163,7 @@ export class UsersController {
     return this.usersService.update(id, body);
   }
 
+  @Roles("ADMIN")
   @Delete(":id")
   @HttpCode(204)
   @DeleteUserApiOperation()
@@ -132,8 +173,7 @@ export class UsersController {
     return this.usersService.remove(id);
   }
 
-  // User routes (specific fields [password, picture, role, email])
-
+  @Roles("ADMIN")
   @Patch(":id/password")
   @ChangeUserPasswordApiOperation()
   @UserIdParam()
@@ -144,5 +184,33 @@ export class UsersController {
     @Body() body: UpdateUserPasswordDto,
   ) {
     return this.usersService.changePassword(id, body);
+  }
+
+  @Roles("ADMIN")
+  @Patch(":id/picture")
+  @UploadPictureApiOperation()
+  @UserIdParam()
+  @UploadPictureApiResponses()
+  @UseInterceptors(FileInterceptor("picture"))
+  @ApiConsumes("multipart/form-data")
+  @UploadPictureApiBody()
+  async uploadPicture(
+    @Param("id") id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException("Picture file is required");
+    }
+
+    return this.usersService.uploadPicture(id, file);
+  }
+
+  @Roles("ADMIN")
+  @Delete(":id/picture")
+  @DeletePictureApiOperation()
+  @UserIdParam()
+  @DeletePictureApiResponses()
+  async deletePicture(@Param("id") id: string) {
+    return this.usersService.deletePicture(id);
   }
 }

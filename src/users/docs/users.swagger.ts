@@ -383,5 +383,89 @@ export const ChangeUserPasswordApiResponses = () =>
     }),
   );
 
+/** AVATAR */
+
+export function UploadPictureApiOperation() {
+  return applyDecorators(
+    ApiOperation({
+      summary: "Upload user avatar",
+      description:
+        "Upload a new avatar image for the user. Accepts JPEG/PNG files up to 5MB.",
+    }),
+  );
+}
+
+export function UploadPictureApiResponses() {
+  return applyDecorators(
+    ApiResponse({
+      status: 200,
+      description: "Picture uploaded successfully",
+      schema: {
+        type: "object",
+        properties: {
+          message: { type: "string", example: "Picture uploaded successfully" },
+          user: {
+            type: "object",
+          },
+        },
+      },
+    }),
+    ApiResponse({
+      status: 400,
+      description: "Bad request - Invalid file type or size",
+    }),
+  );
+}
+
+// decorators/delete-avatar-api-operation.decorator.ts
+export function DeletePictureApiOperation() {
+  return applyDecorators(
+    ApiOperation({
+      summary: "Delete user avatar",
+      description: "Remove the current avatar image for the user.",
+    }),
+  );
+}
+
+// decorators/delete-avatar-api-responses.decorator.ts
+export function DeletePictureApiResponses() {
+  return applyDecorators(
+    ApiResponse({
+      status: 200,
+      description: "Picture deleted successfully",
+      schema: {
+        type: "object",
+        properties: {
+          message: { type: "string", example: "Picture deleted successfully" },
+          user: {
+            type: "object",
+          },
+        },
+      },
+    }),
+    ApiResponse({
+      status: 400,
+      description: "User has no avatar to delete",
+    }),
+  );
+}
+
+export const UploadPictureApiBody = () =>
+  ApiBody({
+    description: "Picture image file",
+    type: "multipart/form-data",
+    schema: {
+      type: "object",
+      properties: {
+        picture: {
+          type: "string",
+          format: "binary",
+          description: "Picture image file (JPEG/PNG)",
+        },
+      },
+      required: ["picture"],
+    },
+  });
+
 // Export common schemas for reuse
 export { UserResponseSchema, CommonResponses };
