@@ -3,8 +3,9 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module";
 import { RequestMethod, ValidationPipe } from "@nestjs/common";
 import { Logger } from "nestjs-pino";
-import pinoHttp from "pino-http";
 import { NextFunction, Request, Response } from "express";
+import pinoHttp from "pino-http";
+import * as cookieParser from "cookie-parser";
 
 const PORT = process.env.PORT ?? 3000;
 
@@ -12,7 +13,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
   });
+  app.use(cookieParser());
 
+  // logger setup:
   app.useLogger(app.get(Logger));
   app.use(
     pinoHttp({

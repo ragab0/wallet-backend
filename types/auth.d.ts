@@ -8,12 +8,6 @@ export interface JwtPayload {
   exp?: number;
 }
 
-export interface RefreshTokenResponse {
-  status: "success";
-  accessToken: string;
-  refreshToken: string;
-}
-
 export interface AuthResponse {
   status: "success";
   accessToken: string;
@@ -46,7 +40,25 @@ export interface OAuthResponse {
   user: OAuthUser;
 }
 
-export interface GoogleProfile extends Profile {
+export interface GoogleOAuthTokenResponse {
+  access_token: string;
+  id_token: string;
+  scope: string;
+  token_type: string;
+  expires_in: number;
+}
+
+export interface GoogleOAuthProfileExchange {
+  id: string;
+  email: string;
+  given_name: string;
+  family_name: string;
+  picture: string;
+  verified_email: boolean;
+  name?: string;
+}
+
+export interface GoogleProfilePassport extends Profile {
   name: {
     givenName: string;
     familyName: string;

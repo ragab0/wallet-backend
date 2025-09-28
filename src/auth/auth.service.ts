@@ -9,15 +9,18 @@ import { plainToInstance } from "class-transformer";
 import { UserResponseDto } from "src/users/dtos/user-response.dto";
 import { User } from "@prisma/client";
 import { EmailService } from "src/email/email.service";
+import { Response } from "express";
 import {
   SendVerificationDto,
   VerifyEmailDto,
 } from "src/email/dtos/email-verification.dto";
 import {
   BadRequestException,
+  Headers,
   HttpException,
   HttpStatus,
   Injectable,
+  Res,
   UnauthorizedException,
 } from "@nestjs/common";
 import {
@@ -27,8 +30,11 @@ import {
   OAuthUser,
 } from "types/auth";
 
-const { JWT_ACCESS_EXPIRES_IN = "15m", JWT_REFRESH_EXPIRES_IN = "7d" } =
-  process.env;
+const {
+  JWT_ACCESS_EXPIRES_IN = "15m",
+  JWT_REFRESH_EXPIRES_IN = "7d",
+  NODE_ENV,
+} = process.env;
 
 @Injectable()
 export class AuthService {
@@ -56,10 +62,33 @@ export class AuthService {
     );
   }
 
-  private sendAuthResponse(user: User): AuthResponse {
+  private sendAuthResponse(
+    user: User,
+    res: Response,
+    isWeb = false,
+  ): AuthResponse {
     const tokenPayload = { id: user.id, email: user.email };
     const accessToken = this.createAccessToken(tokenPayload);
     const refreshToken = this.createRefreshToken(tokenPayload);
+
+    // WEB? Set HTTP-only cookies
+    if (isWeb) {
+      res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: NODE_ENV === "production",
+        sameSite: NODE_ENV === "production" ? "none" : "lax",
+        partitioned: NODE_ENV === "production", // for io;
+        maxAge: parseInt(JWT_REFRESH_EXPIRES_IN) * 24 * 60 * 60 * 1000, // 7 days
+      });
+      return {
+        status: "success",
+        accessToken,
+        refreshToken: "",
+        data: plainToInstance(UserResponseDto, user, {
+          excludeExtraneousValues: true,
+        }),
+      };
+    }
     return {
       status: "success",
       accessToken,
@@ -120,7 +149,11 @@ export class AuthService {
     );
   }
 
-  async login(body: LoginDto): Promise<AuthResponse> {
+  async login(
+    body: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+    @Headers("x-platform") platform: string,
+  ): Promise<AuthResponse> {
     const email = body.email.toLocaleLowerCase().trim();
     const user = await this.databaseService.user.findUnique({
       where: {
@@ -145,10 +178,14 @@ export class AuthService {
       );
     }
 
-    return this.sendAuthResponse(user);
+    return this.sendAuthResponse(user, res, platform === "web");
   }
 
-  async refreshToken(refreshToken: string): Promise<AuthResponse> {
+  async refreshToken(
+    refreshToken: string,
+    @Res({ passthrough: true }) res: Response,
+    @Headers("x-platform") platform: string,
+  ): Promise<AuthResponse> {
     try {
       const payload = this.jwtService.verify<JwtPayload>(refreshToken);
       const user = await this.databaseService.user.findUnique({
@@ -161,37 +198,43 @@ export class AuthService {
         throw new UnauthorizedException("Invalid refresh token");
       }
 
-      return this.sendAuthResponse(user);
+      return this.sendAuthResponse(user, res, platform === "web");
     } catch (_) {
       throw new UnauthorizedException("Invalid refresh token");
     }
   }
 
-  /** Passport auth */
+  /** OAuth */
 
-  async googleLogin(oauthUser: OAuthUser): Promise<AuthResponse> {
-    return this.handleOAuthLogin(oauthUser);
+  async googleOAuth(
+    oauthUser: OAuthUser,
+    @Res({ passthrough: true }) res: Response,
+    @Headers("x-platform") platform: string,
+  ): Promise<AuthResponse> {
+    return this.handleOAuthLogin(oauthUser, res, platform === "web");
   }
 
-  async appleLogin(oauthUser: OAuthUser): Promise<AuthResponse> {
-    return this.handleOAuthLogin(oauthUser);
+  async appleOAuth(
+    oauthUser: OAuthUser,
+    @Res({ passthrough: true }) res: Response,
+    @Headers("x-platform") platform: string,
+  ): Promise<AuthResponse> {
+    return this.handleOAuthLogin(oauthUser, res, platform === "web");
   }
 
-  private async handleOAuthLogin(oauthUser: OAuthUser): Promise<AuthResponse> {
+  private async handleOAuthLogin(
+    oauthUser: OAuthUser,
+    @Res({ passthrough: true }) res: Response,
+    isWeb = false,
+  ): Promise<AuthResponse> {
     // Check if user exists
-    const whereConditions: Record<string, any>[] = [{ email: oauthUser.email }];
-
-    if (oauthUser.googleId)
-      whereConditions.push({ googleId: oauthUser.googleId });
-    else if (oauthUser.appleId)
-      whereConditions.push({ appleId: oauthUser.appleId });
-
-    let user: User | null = await this.databaseService.user.findFirst({
-      where: { OR: whereConditions },
+    let user: User | null = await this.databaseService.user.findUnique({
+      where: { email: oauthUser.email },
     });
 
-    // If user exists, update missing OAuth IDs or picture
-    if (user) {
+    if (user && !user.isActive) {
+      throw new UnauthorizedException("Your account has been deactivated");
+    } else if (user) {
       const updateData: Record<string, any> = {};
       if (oauthUser.googleId && !user.googleId)
         updateData.googleId = oauthUser.googleId;
@@ -206,9 +249,9 @@ export class AuthService {
           data: updateData,
         });
       }
-    }
-    // otherwise, create a new user
-    else {
+      // send login attempt:
+    } else {
+      // otherwise, create a new user
       user = await this.databaseService.user.create({
         data: {
           email: oauthUser.email,
@@ -232,11 +275,7 @@ export class AuthService {
       }
     }
 
-    if (!user.isActive) {
-      throw new UnauthorizedException("Your account has been deactivated");
-    }
-
-    return this.sendAuthResponse(user);
+    return this.sendAuthResponse(user, res, isWeb);
   }
 
   /** email */
@@ -295,7 +334,11 @@ export class AuthService {
     };
   }
 
-  async verifyEmail({ email, code }: VerifyEmailDto): Promise<AuthResponse> {
+  async verifyEmail(
+    { email, code }: VerifyEmailDto,
+    @Res({ passthrough: true }) res: Response,
+    @Headers("x-platform") platform: string,
+  ): Promise<AuthResponse> {
     email = email.trim().toLowerCase();
     const user = await this.databaseService.user.findUnique({
       where: {
@@ -325,6 +368,6 @@ export class AuthService {
       },
     });
 
-    return this.sendAuthResponse(updatedUser);
+    return this.sendAuthResponse(updatedUser, res, platform === "web");
   }
 }
